@@ -49,7 +49,7 @@ Generator = (function() {
                 if (err != null) {
                     throw err;
                 }
-                return console.log("> " + replies);
+                return console.log(clc.green("" + replies));
             });
         });
     };
@@ -68,7 +68,6 @@ Reader = (function() {
 
     Reader.eventHandler = function(msg, callback) {
         var onComplete;
-        console.log("catch_val " + msg);
         onComplete = function() {
             var error;
             error = Math.random() > 0.85;
@@ -92,7 +91,8 @@ Reader = (function() {
                 if (err != null) {
                     throw err;
                 }
-                return Reader.eventHandler(data, Reader.error_getter);
+                Reader.eventHandler(data, Reader.error_getter);
+                return console.log("read: " + data);
             });
         });
     };
@@ -109,7 +109,7 @@ action = function() {
         if ((data == null) || data === uuid) {
             client.set('generator:id', uuid);
             client.expire('generator:id', settings.timeout_generator_s);
-            console.log("I'am generator " + uuid);
+            console.log(clc.bgGreen("I'am generator " + uuid));
             Generator.create();
         } else {
             Reader.read();
@@ -126,7 +126,7 @@ action = function() {
 
 arg = process.argv.slice(2);
 
-if (arg.indexOf('getErrors' > -1)) {
+if ((arg.indexOf('getErrors')) > -1) {
     console.log(clc.bgRedBright('Show errors:'));
     client.lrange('error:list', 0, -1, function(err, res) {
         var i, _i, _len;
@@ -141,20 +141,32 @@ if (arg.indexOf('getErrors' > -1)) {
             if (err != null) {
                 throw err;
             }
+            console.log(clc.bgRedBright("Error list cleared: " + res));
+            return process.exit();
         });
     });
-    process.exit();
+} else if ((arg.indexOf('1M')) > -1) {
+    console.log(clc.bgGreen('Create 1 000 000 record:'));
+    client.flushdb(function() {
+        var i, _i, _results;
+        _results = [];
+        for (i = _i = 1; _i <= 1000000; i = ++_i) {
+            client.rpush('msg:processed', i);
+            client.hset('msg:hlist', i, Generator.getMessage());
+            if (i >= 1000000) {
+                client.set('msg:id_cnt', i);
+                console.log(clc.bgBlueBright('+1 000 000 record'));
+                _results.push(process.exit());
+            } else {
+                _results.push(void 0);
+            }
+        }
+        return _results;
+    });
+} else if ((arg.indexOf('clear')) > -1) {
+    client.flushdb(function() {
+        return process.exit();
+    });
 } else {
-    setInterval(action, 500);
+    setInterval(action, settings.timeout_ms);
 }
-
-
-/*
-===
-таблицы:
-    таблица с сообщениями - msg:hlist  ( hash ) id msg
-    таблица со списком созданных id - msg:id_cnt (key)
-    таблица со списком не обработанных сообщений - msg:processed ( list ) id id id ...
-    таблица с ошибками  - error:list ( list )
-    таблица с id генератора и временем последней обработки продолжительность жизни 1с  -  generator:id ( key )
- */
