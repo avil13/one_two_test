@@ -1,0 +1,8 @@
+!.gitignore
+
+node_modules/*
+
+.idea/
+.directory
+.DS_Store
+Thumbs.db
